@@ -1,4 +1,4 @@
-# 록맨 제로&ZX 레거시 컬렉션 한글패치 v0.9.4 (시험판)
+# 록맨 제로&ZX 레거시 컬렉션 한글패치 v0.9.5 (시험판)
 
 Mega Man Zero/ZX Legacy Collection (Nintendo Switch, 010025C00D410000) 한글패치입니다.
 런처와 여섯 게임의 **일본어(日本語) 칸**을 한국어로 바꿉니다. 영어 등 다른 언어 칸은 그대로입니다.
@@ -20,13 +20,13 @@ Mega Man Zero/ZX Legacy Collection (Nintendo Switch, 010025C00D410000) 한글패
 ## 설치
 
 ### 스위치 (Atmosphere)
-`MMZZXLC_KR_v0.9.4_atmosphere.zip` 을 SD 카드 루트에 풉니다.
+`MMZZXLC_KR_v0.9.5_atmosphere.zip` 을 SD 카드 루트에 풉니다.
 - `atmosphere/contents/010025C00D410000/romfs/...` (글꼴·대사·그림)
 - `atmosphere/contents/010025C00D410000/exefs/subsdk9` (한글 출력 모듈)
 - `atmosphere/exefs_patches/MMZZXLC_KoreanPatch/48A7577F4E740FEDCB50BA59D7B45AF4.ips` (실행 파일 패치)
 
 ### 에뮬레이터 (Eden / yuzu 계열, Ryujinx)
-`MMZZXLC_KR_v0.9.4_emulator.zip` 을 풀면 나오는 `KoreanPatch` 폴더를 게임의 모드 폴더에 넣습니다.
+`MMZZXLC_KR_v0.9.5_emulator.zip` 을 풀면 나오는 `KoreanPatch` 폴더를 게임의 모드 폴더에 넣습니다.
 - Eden / yuzu 계열: `load/010025C00D410000/KoreanPatch/{romfs,exefs}`
 - Ryujinx: `mods/contents/010025C00D410000/KoreanPatch/{romfs,exefs}`
 

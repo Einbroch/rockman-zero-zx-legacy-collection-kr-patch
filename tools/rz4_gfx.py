@@ -29,8 +29,10 @@ TILESETS = [
     ('title_z4', 0, 0x00, 0xB6C028, 'merge'),    # 타이틀 로고(8bpp) — 컬렉션판이 고친 타일과 겹쳐 병합
     ('title_z4', 0, 0x14, 0xB6C03C, True),       # 시작 안내
 ]
-RAW_REGIONS = [(0xB78000, 0xB86000), (0xB8FE00, 0xB92000), (0xC61000, 0xC6C000), (0xCAC000, 0xCB1000)]   # 일시정지 네 쪽(엘프 쪽 0xB844F4~ 포함), 코드네임(결과 화면), 스프라이트 라벨, 타이틀 메뉴·난이도 단어(OBJ 시트 0xCAE368)
+# 0xB885D4~: 데이터베이스 탭·안내 줄(GBA rz4/database4_gfx, 컬렉션 sub_dtbase_z4·sub_recipe_z4 #0 — 같은 타일셋)
+RAW_REGIONS = [(0xB78000, 0xB86000), (0xB885D4, 0xB885D4 + 0x160 * 32), (0xB8FE00, 0xB92000), (0xC61000, 0xC6C000), (0xCAC000, 0xCB1000)]   # 일시정지 네 쪽(엘프 쪽 0xB844F4~ 포함), 코드네임(결과 화면), 스프라이트 라벨, 타이틀 메뉴·난이도 단어(OBJ 시트 0xCAE368)
 RAW_ENTRIES = [('sub_z4', 0), ('sub_elf_z4', 0), ('sub_mini_z4', 0), ('sub_result_z4', 0), ('sub_save_z4', 0),
+               ('sub_dtbase_z4', 0), ('sub_recipe_z4', 0),
                ('obj_fnt_z4', 53), ('obj_fnt_z4', 65), ('obj_fnt_z4', 172)]
 
 
