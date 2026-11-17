@@ -1,0 +1,2 @@
+2267395b7e63ffcf35feb6c6354aa142ae58c3ee264d6983b98e4a7b56a49d2c  MMZZXLC_KR_v0.9.0_atmosphere.zip
+800daa9bf28455cfe5baf67e45356a2eccb85da0d7b899c9effaab2d41c2aee2  MMZZXLC_KR_v0.9.0_emulator.zip

@@ -1,0 +1,12 @@
+# 게임 파일·추출물·빌드 결과는 넣지 않는다
+_work/
+build/
+dist/
+*.nsp
+*.nca
+*.gba
+*.nds
+kohook/target/
+kohook/data/
+kohook/kohook.elf
+__pycache__/
