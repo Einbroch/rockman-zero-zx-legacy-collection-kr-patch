@@ -69,6 +69,7 @@ run(sys.executable, '-I', os.path.join(ROOT, 'tools', 'rz1_gfx.py'))   # 그림 
 run(sys.executable, '-I', os.path.join(ROOT, 'tools', 'rz2_gfx.py'))
 run(sys.executable, '-I', os.path.join(ROOT, 'tools', 'rz3_gfx.py'))
 run(sys.executable, '-I', os.path.join(ROOT, 'tools', 'rz4_gfx.py'))
+run(sys.executable, '-I', os.path.join(ROOT, 'tools', 'credits_ko.py'))   # 런처 크레딧 직함 번역
 run(sys.executable, '-I', os.path.join(ROOT, 'tools', 'launcher_build.py'))   # 런처 GMD·글꼴 → build/romfs/.../romNX
 if '--deploy' in sys.argv:   # Eden 모드 폴더에 복사
     import shutil

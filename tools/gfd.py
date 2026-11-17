@@ -1,5 +1,5 @@
 """MT Framework GFD(컬렉션 런처 글꼴 정의, 판 0x11107) 읽기/쓰기.
-머리 u32 10개(0 마법 'GFD', 1 판, …, 6 텍스처 수, 7 글자 수, …) + 실수 5개(0x28~) + u32 이름 길이(0x3c) + 이름 + NUL,
+머리 u32 10개(0 마법 'GFD', 1 판, …, 6 텍스처 수, 7 글자 수, …, 9) + 실수 4+머리[9]개(0x28~) + u32 이름 길이 + 이름 + NUL,
 그다음 글자 항목 36바이트 × 글자 수(코드포인트 오름차순): u32 코드, 실수 6개(폭, 높이, 왼쪽 여백, 위 여백, 전진폭, 줄 높이),
 u32 위치(페이지 0~7비트 | x 8~19비트 | y 20~31비트), u32 (뜻 미상, 원본 값 그대로)."""
 import struct
@@ -9,9 +9,11 @@ class Gfd:
     def __init__(self, b):
         assert b[:4] == b'GFD\0'
         self.head = list(struct.unpack_from('<10I', b, 0))
-        self.floats = struct.unpack_from('<5f', b, 0x28)
-        nl = struct.unpack_from('<I', b, 0x3c)[0]
-        self.hdr_end = 0x40 + nl + 1
+        nf = 4 + self.head[9]          # 실수 개수: 일본어·영어 등 5개(머리[9]=1), 번체 6개(머리[9]=2)
+        self.floats = struct.unpack_from('<%df' % nf, b, 0x28)
+        no = 0x28 + 4 * nf
+        nl = struct.unpack_from('<I', b, no)[0]
+        self.hdr_end = no + 4 + nl + 1
         self.prefix = b[:self.hdr_end]
         n = self.head[7]
         self.chars = []

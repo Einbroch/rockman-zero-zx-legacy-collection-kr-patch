@@ -5,6 +5,7 @@
 """
 import glob
 import json
+from collections import Counter
 import os
 import re
 import struct
@@ -31,6 +32,8 @@ TEX_HASH = 0x241f5deb
 # 슬롯 → (글꼴 굵기). 짝수 슬롯 = SL0(본문, 가는 글꼴), 홀수 슬롯 = SL1(제목, 굵은 기울임 글꼴)
 SLOT_WEIGHT = {0: 5, 1: 7, 2: 5, 3: 7, 4: 5, 5: 7}
 PAGE = 1024
+GLYPH_ALIAS = {'・': '·'}   # 에스코어 드림에 없는 글자 → 모양이 같은 글자로 그림
+LANGS = ('jpn', 'eng', 'fre', 'ger', 'ita', 'spa', 'chT', 'chS')
 GAP = 3
 TAG = re.compile(r'<[^<>]*>')
 
@@ -99,9 +102,9 @@ def pack(sizes):
     return pos, (page + 1 if sizes else 0)
 
 
-def build_font(need, report=False):
-    """need: {0: SL0 글자, 1: SL1 글자} → 새 Font_jpn.arc 바이트(바뀐 게 없으면 None)"""
-    path = os.path.join(SRC, 'Font_jpn.arc')
+def build_font(need, lang='jpn', report=False):
+    """need: {0: SL0 글자, 1: SL1 글자} → 새 Font_<lang>.arc 바이트(바뀐 게 없으면 None)"""
+    path = os.path.join(SRC, f'Font_{lang}.arc')
     d, _, _, es = mtarc.parse(path)
     E = {e['name']: e for e in es}
     tex_head = None
@@ -113,17 +116,17 @@ def build_font(need, report=False):
                 break
     replace, add = {}, []
     for slot, wt in SLOT_WEIGHT.items():
-        gname = r'Font\Slot\SLOT%02d_zoom_jpn' % slot
+        gname = r'Font\Slot\SLOT%02d_zoom_' % slot + lang
         g = gfd.Gfd(mtarc.blob(d, E[gname]))
         S, LH, ASC = g.floats[0], g.floats[1], g.floats[2]
         missing = sorted(c for c in need[slot % 2] if ord(c) not in g.by_code)
         if not missing:
             continue
         font = ImageFont.truetype(os.path.join(FONT_DIR, f'SCDream{wt}.otf'), int(round(S)))
-        p2 = g.by_code[0x4e00]['p2']
+        p2 = Counter(c['p2'] for c in g.chars).most_common(1)[0][0]   # 거의 모든 글자가 같은 값
         imgs, metas = [], []
         for ch in missing:
-            a, f = render_glyph(font, ch, S, ASC)
+            a, f = render_glyph(font, GLYPH_ALIAS.get(ch, ch), S, ASC)
             if a is None and not ch.isspace():
                 raise SystemExit(f'글꼴에 없는 글자: {ch!r} U+{ord(ch):04X}')
             if a is None:
@@ -142,11 +145,11 @@ def build_font(need, report=False):
         for k, c in enumerate(canv):
             lin = bc7a.encode(c)
             sw = deswizzle.swizzle(lin, PAGE // 4, hb, 16, fonttex.block_height(hb))
-            add.append((r'Font\Slot\SLOT%02d_zoom_jpn_%02d_ID' % (slot, base + k), TEX_HASH, tex_head + sw))
+            add.append((r'Font\Slot\SLOT%02d_zoom_%s_%02d_ID' % (slot, lang, base + k), TEX_HASH, tex_head + sw))
             if report:
-                Image.fromarray(c).save(os.path.join(ROOT, '_work', 'shots', f'lfont_s{slot}_p{base + k}.png'))
+                Image.fromarray(c).save(os.path.join(ROOT, '_work', 'shots', f'lfont_{lang}_s{slot}_p{base + k}.png'))
         replace[gname] = g.build()
-        print(f'  SLOT{slot:02d}: 글자 {len(missing)}개 추가, 새 페이지 {npages}장 (크기 {S:g}, 굵기 {wt})')
+        print(f'  {lang} SLOT{slot:02d}: 글자 {len(missing)}개 추가, 새 페이지 {npages}장 (크기 {S:g}, 굵기 {wt})')
     if not replace:
         return None
     return arcpack.rebuild(path, replace=replace, add=add)
@@ -167,21 +170,25 @@ def main():
         rel = os.path.relpath(p, SRC)
         dst = os.path.join(OUT, rel)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
-        if os.path.basename(p) == 'Font_jpn.arc':
-            raise SystemExit('Font_jpn.arc 에 GMD 가 있다: 처리 순서 재검토 필요')
+        if os.path.basename(p).startswith('Font_'):
+            raise SystemExit(f'{p} 에 GMD 가 있다: 처리 순서 재검토 필요')
         open(dst, 'wb').write(arcpack.rebuild(p, replace=rep))
-    fa = build_font(need, report)
-    if fa is not None:
-        open(os.path.join(OUT, 'Font_jpn.arc'), 'wb').write(fa)
+    # 한글은 모든 언어 글꼴에 넣는다: 크레딧처럼 런처 언어가 아니라 본체 언어 글꼴로 그리는 화면이 있다(11/17 실측)
+    for lang in LANGS:
+        fa = build_font(need, lang, report)
+        if fa is None:
+            continue
+        name = f'Font_{lang}.arc'
+        open(os.path.join(OUT, name), 'wb').write(fa)
         # 다시 읽어 검증: 모든 번역 글자가 해당 슬롯 GFD 에 있고 페이지 텍스처가 있다
-        d, _, _, es = mtarc.parse(os.path.join(OUT, 'Font_jpn.arc'))
+        d, _, _, es = mtarc.parse(os.path.join(OUT, name))
         E = {e['name']: e for e in es}
         for slot in SLOT_WEIGHT:
-            g = gfd.Gfd(mtarc.blob(d, E[r'Font\Slot\SLOT%02d_zoom_jpn' % slot]))
+            g = gfd.Gfd(mtarc.blob(d, E[r'Font\Slot\SLOT%02d_zoom_' % slot + lang]))
             miss = [c for c in need[slot % 2] if ord(c) not in g.by_code]
-            assert not miss, (slot, miss[:10])
+            assert not miss, (lang, slot, miss[:10])
             for k in range(g.head[6]):
-                assert r'Font\Slot\SLOT%02d_zoom_jpn_%02d_ID' % (slot, k) in E, (slot, k)
+                assert r'Font\Slot\SLOT%02d_zoom_%s_%02d_ID' % (slot, lang, k) in E, (lang, slot, k)
     print('출력 ->', OUT)
 
 
