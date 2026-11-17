@@ -5,6 +5,7 @@
 #82 = 0x5D7F60(엘프 목록 단추; 팔레트 0x5FD950 과 순서까지 같음, 타일도 GBA 순서 그대로 —
 같은 일본어 그림이 여러 자리에 있어 순서 규칙으로 자리를 정한다)."""
 import os
+import struct
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -28,7 +29,7 @@ TILESETS = [
     ('result_z3', 0, 0x00, 0x547438, True ),    # 결과 화면
     ('result_z3', 0, 0x14, 0x5475DC, False),    # 결과 화면 코드네임
     ('g_over_z3', 0, 0x00, 0x547A78, False),    # 게임오버
-    ('title_z3', 0, 0x00, 0x5472A8, True),      # 타이틀 로고(컬렉션판이 일부 고침)
+    ('title_z3', 0, 0x00, 0x5472A8, 'merge'),   # 타이틀 로고: 컬렉션판이 ® 를 지움 → 한글판 바뀐 바이트를 덮고(ㅈ 가 그 자리) ® 지움은 옮긴다
     ('title_z3', 0, 0x14, 0x5472BC, False),     # 시작 안내
 ]
 SPRITES = [
@@ -41,4 +42,4 @@ SPRITES = [
 ]
 
 if __name__ == '__main__':
-    rz2_gfx.run(JP_ROM, KR_ROM, TILESETS, SPRITES, 'obj_fnt_z3')
+    rz2_gfx.run(JP_ROM, KR_ROM, TILESETS, SPRITES, 'obj_fnt_z3', post={('title_z3', 0, 0x00): rz2_gfx.logo_post(3, 0x522ED0, 0x100, cols=30)})

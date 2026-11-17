@@ -38,7 +38,7 @@ TILESETS = [
     ('sub_com_z2', 0, 0x00, 0x3918B4, False),   # 통신 대전
     ('sub_com_z2', 0, 0x14, 0x391E54, False),   # 통신 대전 쪽 게임오버
     ('gameover_z2', 0, 0x00, 0x391E54, False),  # 게임오버
-    ('title_z2', 0, 0x14, 0x391EA4, True),      # 타이틀 로고(컬렉션판은 메뉴 글자를 지움)
+    ('title_z2', 0, 0x14, 0x391EA4, 'merge'),   # 타이틀 로고: 컬렉션판이 메뉴 글자·® 를 지움 → 한글 바뀐 바이트를 덮고 ® 지움은 옮긴다
 ]
 
 # 라벨 스프라이트: (GBA 스트림 서술자, GBA 팔레트, obj_fnt_z2 항목, 모호한 자리 지정 {(행, 타일): 항목 오프셋})
@@ -133,7 +133,40 @@ def color_map(d, prel, jp, kr, sp, jt, tiles):
     return cmap
 
 
-def run(jp_path, kr_path, tilesets, sprites, objfile):
+def gba_logo_modules(title):
+    """GBA 저장소의 logo_redraw 와 편별 로고 모듈(rzN/logo_rzN.py)"""
+    g = os.path.join(ROOT, '..', 'Rockman Zero')
+    for q in (os.path.join(g, 'tools'), os.path.join(g, f'rz{title}')):
+        if q not in sys.path:
+            sys.path.insert(0, q)
+    import importlib
+    return importlib.import_module('logo_redraw'), importlib.import_module(f'logo_rz{title}')
+
+
+def move_registered_erase(title, get_jp, get_kr, get_coll, set_new, at, label):
+    """컬렉션판은 일본어 로고의 ® 를 지웠다. 한글판(logo_redraw)은 ® 를 「록맨」 뒤 판 위로 옮겼으므로 그 칸을 판 색으로 메운다
+    (® 없는 컬렉션 로고와 맞춤). 컬렉션 지움 값을 그대로 옮기면 일본어 ® 둘레의 글자 테두리 조각까지 따라온다.
+    logo_redraw 가 ® 칸이 판 안이고 글자·테두리와 안 겹침을 이미 검사한다. at(x, y) = 타일셋 공간 위치."""
+    TL, LM = gba_logo_modules(title)
+    rx0, ry0, rx1, ry1 = LM.SPEC['registered']
+    kx = TL.registered_x(LM.SPEC)
+    plate = LM.SPEC['plate']
+    if not any(get_coll(at(rx0 + dx, ry0 + dy)) != get_jp(at(rx0 + dx, ry0 + dy))
+               for dy in range(ry1 - ry0 + 1) for dx in range(rx1 - rx0 + 1)):
+        fail(f'{label}: 컬렉션이 ® 를 지우지 않았음 — 이 처리 재검토')
+    n = 0
+    for dy in range(ry1 - ry0 + 1):
+        for dx in range(rx1 - rx0 + 1):
+            src, dst = at(rx0 + dx, ry0 + dy), at(kx + dx, ry0 + dy)
+            if get_kr(dst) != get_jp(src):
+                fail(f'{label}: 한글 ® 자리 ({kx + dx}, {ry0 + dy}) 가 일본어 ® 칸과 다름')
+            set_new(dst, plate)
+            n += 1
+    print(f'{label}: 한글 ® 칸(x {kx}~{kx + rx1 - rx0}, y {ry0}~{ry1}) {n}픽셀을 판 색 {plate} 으로 지움(컬렉션판처럼 ® 없음)')
+
+
+def run(jp_path, kr_path, tilesets, sprites, objfile, post=None):
+    """post: {(파일, 항목, 레코드): f(new, jraw, kraw, coll)} — 이식 뒤 타일셋을 더 고칠 때(예: 컬렉션이 지운 ® 를 옮긴 자리에서도 지움)"""
     sys.stdout.reconfigure(encoding='utf-8')
     sys.stderr.reconfigure(encoding='utf-8')
     jp = open(jp_path, 'rb').read()
@@ -177,6 +210,8 @@ def run(jp_path, kr_path, tilesets, sprites, objfile):
             moved += len(ks)
         if conflict and not allow:
             fail(f'{fn}#{i}@{rec:#x} ({desc:#x}): 컬렉션판이 고친 바이트와 겹침 {conflict}')
+        if post and (fn, i, rec) in post:
+            post[(fn, i, rec)](new, jraw, kraw, coll)
         packed = lz77.compress_optimal(bytes(new))
         if lz77.decompress(packed)[0] != new:
             fail('LZ 왕복 실패')
@@ -252,10 +287,19 @@ def run(jp_path, kr_path, tilesets, sprites, objfile):
         print(f'{fn}.bin: 항목 {sorted(news)} 교체, {len(buf):#x} -> {len(out):#x}')
 
 
+def logo_post(title, map_addr, tile0, cols=32):
+    """타일셋 레코드 로고(2·3편): 타일 번호 = (맵 칸 & 0x3FF) - tile0, 맵 한 행 cols 칸 (GBA logo_rzN 과 같은 계산)"""
+    def f(new, jraw, kraw, coll):
+        jp = open(JP_ROM if title == 2 else os.path.join(ROOT, '..', 'Rockman Zero', 'roms', f'Rockman Zero {title} (Japan).gba'), 'rb').read()
+        at = lambda x, y: ((struct.unpack_from('<H', jp, map_addr + ((y // 8) * cols + x // 8) * 2)[0] & 0x3FF) - tile0) * 64             + (y % 8) * 8 + x % 8
+        move_registered_erase(title, jraw.__getitem__, kraw.__getitem__, coll.__getitem__, new.__setitem__, at, f'title_z{title} 로고')
+    return f
+
+
 def main():
     run(JP_ROM, KR_ROM, TILESETS,
         [dict(kind='stream', desc=desc, gpal=gpal, entry=ei, fixed=fixed) for desc, gpal, ei, fixed in SPRITES],
-        'obj_fnt_z2')
+        'obj_fnt_z2', post={('title_z2', 0, 0x14): logo_post(2, 0x3873B0, 0)})
 
 
 if __name__ == '__main__':

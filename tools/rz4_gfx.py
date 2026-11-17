@@ -10,6 +10,7 @@
 출력: build/romfs/nativeNXx64/RZZC/ZC/DATA/<파일>"""
 import collections
 import os
+import struct
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -146,8 +147,38 @@ def opening(jp, kr):
     print(f'opening_z4.bin: {len(buf):#x} -> {len(out):#x}')
 
 
+LOGO_MAP = 0xB2CCE0
+
+
+def logo_erase_registered(new, jraw, kraw, coll):
+    """컬렉션판은 일본어 로고의 ® 를 「ゼ」 획을 늘려 지웠다(x 110~131, y 51~59 의 바뀐 픽셀 = 지움 영역).
+    한글판(logo4)은 ® 를 제자리에 두고 「제」 를 옆에 그려, 병합하면 한글판이 안 바꾼 픽셀에 컬렉션의 「ゼ」 조각이 남는다.
+    → 지움 영역 중 한글판이 안 바꾼 픽셀은 같은 행에서 가장 가까운 지움 영역 밖 픽셀(병합 결과)로 메워 ® 없이 둔다."""
+    jp = open(JP_ROM, 'rb').read()
+    ent = struct.unpack_from('<1024H', jp, LOGO_MAP)
+    at = lambda x, y: ((ent[(y // 8) * 32 + x // 8] & 0x3FF) - 0x100) * 64 + (y % 8) * 8 + x % 8
+    inside = lambda x, y: 0 <= at(x, y) < len(jraw)
+    erased = {(x, y) for y in range(30, 80) for x in range(240) if inside(x, y) and coll[at(x, y)] != jraw[at(x, y)]}   # 로고 띠만(저작권 줄 수정은 따로)
+    if not erased:
+        fail('title_z4: 컬렉션이 로고를 고치지 않았음 — 이 처리 재검토')
+    if max(y for x, y in erased) - min(y for x, y in erased) > 12 or max(x for x, y in erased) - min(x for x, y in erased) > 32:
+        fail('title_z4: 컬렉션 수정 범위가 ® 자리보다 넓음 — 이 처리 재검토')
+    fill = [(x, y) for x, y in erased if kraw[at(x, y)] == jraw[at(x, y)]]
+    src = dict(((x, y), new[at(x, y)]) for y in range(160) for x in range(240) if inside(x, y) and (x, y) not in erased)
+    for x, y in fill:
+        for d in range(1, 40):
+            hit = [src.get((x - d, y)), src.get((x + d, y))]
+            hit = [h for h in hit if h is not None]
+            if hit:
+                new[at(x, y)] = hit[0]
+                break
+        else:
+            fail(f'title_z4: ({x}, {y}) 메울 이웃 없음')
+    print(f'title_z4 로고: 컬렉션 ® 지움 자리 {len(erased)}픽셀 중 한글판이 안 바꾼 {len(fill)}픽셀을 같은 행 이웃으로 메움')
+
+
 if __name__ == '__main__':
-    rz2_gfx.run(JP_ROM, KR_ROM, TILESETS, [], 'obj_fnt_z4')
+    rz2_gfx.run(JP_ROM, KR_ROM, TILESETS, [], 'obj_fnt_z4', post={('title_z4', 0, 0x00): logo_erase_registered})
     _jp, _kr = open(JP_ROM, 'rb').read(), open(KR_ROM, 'rb').read()
     raw_tiles(_jp, _kr)
     opening(_jp, _kr)

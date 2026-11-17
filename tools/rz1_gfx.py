@@ -26,7 +26,7 @@ LINEAR = [
     ('sub_z1', 0, 0x2F5C00, 0x2F5C14, 0x2FDD94, False),       # 서브 화면 라벨·칭호·옵션
     ('sub_elf_z1', 0, 0x2F5C00, 0x2F5C14, 0x2FDD94, False),   # 엘프 화면에서 같은 그림
     ('result_z1', 0, 0x2FFC20, 0x2FFC34, 0x303CF4, False),    # 결과 화면 라벨
-    ('title_z1', 0, 0x2F121C, 0x2F1294, 0x2F5B54, True),      # 타이틀 로고(컬렉션판은 배경·저작권 줄을 지움)
+    ('title_z1', 0, 0x2F121C, 0x2F1294, 0x2F5B54, 'merge'),   # 타이틀 로고: 컬렉션판이 배경·저작권 줄·® 를 지움 → 한글 바뀐 바이트를 덮고 ® 지움은 옮긴다
     ('title_z1', 0, 0x303FDC, 0x308914, 0x30E014, False),     # 타이틀 메뉴 글자
 ]
 
@@ -98,12 +98,21 @@ def main():
             o = a - base
             if d[o] != jp[a]:
                 conflict += 1
-                continue
+                if allow != 'merge':
+                    continue
             d[o] = kr[a]
             moved += 1
         if conflict and not allow:
             fail(f'{fn}#{i} {base:#x}: 컬렉션판과 다른 바이트 {conflict}개')
-        print(f'{fn}#{i} {lo:#x}-{hi:#x}: {moved} 바이트, 충돌 {conflict}')
+        print(f'{fn}#{i} {lo:#x}-{hi:#x}: {moved} 바이트, 충돌 {conflict}' + (' (한글 바이트로 덮음)' if allow == 'merge' else ''))
+        if fn == 'title_z1' and lo == 0x2F1294:   # 로고: 컬렉션이 지운 ® 를 한글 ® 자리에서도 지운다
+            coll = zcpack.entries(work[fn][0])[i][3]
+            ent = struct.unpack_from('<1024H', jp, 0x2E008C)
+            at = lambda x, y: 0x2F1294 + (ent[(y // 8) * 32 + x // 8] & 0x3FF) * 64 + (y % 8) * 8 + x % 8
+            def setter(a, v, d=d, base=base):
+                d[a - base] = v
+            import rz2_gfx   # rz2_gfx 가 이 모듈의 rebuild 를 가져가므로 여기서 늦게
+            rz2_gfx.move_registered_erase(1, jp.__getitem__, kr.__getitem__, lambda a: coll[a - base], setter, at, 'title_z1 로고')
         total += moved
 
     # 무기 라벨
