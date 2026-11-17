@@ -202,10 +202,11 @@ def run(jp_path, kr_path, tilesets, sprites, objfile):
             if jt[key] != kt[key]:
                 groups.setdefault(jt[key], []).append(key)
         n = 0
-        if sp.get('linear'):   # 컬렉션이 GBA 타일 순서 그대로(타일 t -> 0x14 + 32t)
+        if sp.get('linear'):   # 컬렉션이 GBA 타일 순서 그대로(타일 t -> 0x14 + 32t, remap 으로 예외 지정)
+            remap = sp.get('remap', {})
             for jtile, keys in groups.items():
                 for k in keys:
-                    o = 0x14 + 32 * k
+                    o = 0x14 + 32 * remap.get(k, k)
                     if tiles.get(o) != unpixels([cmap[p] for p in pixels(jtile)]):
                         fail(f"스프라이트 {sp['desc']:#x} 타일 {k}: 순서대로 자리에 일본어 타일이 없음")
                     d[o:o + 32] = unpixels([cmap[p] for p in pixels(kt[k])])

@@ -34,6 +34,10 @@ TILESETS = [
 SPRITES = [
     dict(kind='tileset', desc=0x5D7A24, gpal=0x5DF7AC, entry=15),
     dict(kind='tileset', desc=0x5D7F60, gpal=0x5FD950, entry=82, linear=True),
+    # 로고 등장 연출 글자 띠: 98 번부터 컬렉션이 작은 스프라이트마다 4타일 칸으로 띄워 담았다(GBA 112장 → 133장)
+    dict(kind='tileset', desc=0x5D849C, gpal=0x61B11C, entry=149, linear=True,
+         remap={98: 100, 99: 101, 100: 104, 101: 105, 102: 108, 103: 109, 104: 112, 105: 113,
+                106: 116, 107: 117, 108: 120, 109: 124, 110: 128, 111: 132}),
 ]
 
 if __name__ == '__main__':
