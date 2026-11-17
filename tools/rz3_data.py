@@ -84,12 +84,59 @@ for s, (ko, jo) in enumerate(zip(koffs, joffs)):
     else:
         if msg_end(rom, text_base + ko) > NATIVE_COPY: fail(f'시스템 S{s:03X} 번역이 원문 사본과 겹침')
         translated += 1
-sys_region = rom[text_base:NATIVE_COPY + len(original)]
+sys_region = bytearray(rom[text_base:NATIVE_COPY + len(original)])
+sys_table = bytearray(rom[table:table + 2 * count])
+
+# 오프닝 스크롤(S00A): 일본어는 줄 앞 공백으로 가운데를 맞추는데, GBA 한글판은 줄 타일을 미리 가운데로 합성해(scroll.py)
+# 번역문엔 앞 공백이 없다 → 컬렉션은 출력기로 그리므로 왼쪽에 붙는다. 줄마다 일본어 줄의 가운데에 오도록
+# 한글 공백(4px)을 앞에 붙인 사본을 번역 창 빈자리에 쓰고 S00A 오프셋을 옮긴다(2편 rz2_data 와 같은 기준).
+SCROLL_SLOT, KR_SPACE = 0x0A, b'\xec\x04'
+def _glyph_w(b, i):
+    c = b[i]
+    if 0xEC <= c <= 0xEF:
+        return ((ents[((c - 0xEC + 2) << 8) + b[i + 1]] >> 16) & 0x7FFF) * 4, 2
+    if 0xF3 <= c <= 0xF8:
+        return 0, 2
+    return ((ents[c] >> 16) & 0x7FFF) * 4, 1
+def _jp_cols(line):   # (앞 공백 칸, 전체 칸) — 8px 칸
+    lead = len(line) - len(line.lstrip(b'\x00'))
+    i = cols = 0
+    while i < len(line):
+        i += 2 if line[i] == 0xF0 else 1
+        cols += 1
+    return lead, cols
+_ka = text_base + koffs[SCROLL_SLOT]
+_kr_lines = rom[_ka:msg_end(rom, _ka) - 1].split(b'\xfc')
+_ja = SYS_TEXT + joffs[SCROLL_SLOT]
+_jp_lines = src[_ja:msg_end(src, _ja) - 1].split(b'\xfc')
+if len(_kr_lines) != len(_jp_lines): fail(f'오프닝 줄 수 불일치 {len(_kr_lines)} != {len(_jp_lines)}')
+_out = []
+for jl, kl in zip(_jp_lines, _kr_lines):
+    if not kl or kl.startswith(KR_SPACE) or kl[:1] == b'\x00':
+        if kl and not jl: fail('오프닝: 일본어 빈 줄에 한글')
+        _out.append(kl)
+        continue
+    width, i = 0, 0
+    while i < len(kl):
+        w, n = _glyph_w(kl, i); width += w; i += n
+    lead, cols = _jp_cols(jl)
+    center = (lead + (cols - lead) / 2) * 8 if jl.strip(b'\x00') else 120
+    pad = max(0, round((center - width / 2) / 4))
+    if pad * 4 + width > 240: fail(f'오프닝 줄 폭 초과 ({width}px)')
+    _out.append(KR_SPACE * pad + kl)
+_scroll = b'\xfc'.join(_out) + b'\xff'
+_free = (max(msg_end(rom, text_base + k) for k in koffs if k < 0x8000) - text_base + 3) & ~3
+if _free + len(_scroll) > 0x8000 or any(b != 0xFF for b in sys_region[_free:_free + len(_scroll)]):
+    fail('오프닝 사본 자리 없음')
+sys_region[_free:_free + len(_scroll)] = _scroll
+struct.pack_into('<H', sys_table, 2 * SCROLL_SLOT, _free)
+print(f'rz3: opening {len(_out)} lines centred ({len(_scroll)} B at window {_free:#x})')
+sys_region = bytes(sys_region)
 
 dialogue = rom[lo:hi]
 text = dialogue + sys_region
 kr_len = len(dialogue) + 0x8000          # 한글 구간: 대사 + 시스템 번역 창
-blob = zcblob.pack(b'RZ3K', gtab, qdat, text, kr_len, [], rom[table:table + 2 * count], len(dialogue),
+blob = zcblob.pack(b"RZ3K", gtab, qdat, text, kr_len, [], bytes(sys_table), len(dialogue),
                    [(ot - lo, body - lo) for ot, body in banks])
 out = os.path.join(ROOT, 'kohook', 'data', 'rz3.bin')
 open(out, 'wb').write(blob)
