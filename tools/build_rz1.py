@@ -71,6 +71,7 @@ run(sys.executable, '-I', os.path.join(ROOT, 'tools', 'rz3_gfx.py'))
 run(sys.executable, '-I', os.path.join(ROOT, 'tools', 'rz4_gfx.py'))
 run(sys.executable, '-I', os.path.join(ROOT, 'tools', 'credits_ko.py'))   # 런처 크레딧 직함 번역
 run(sys.executable, '-I', os.path.join(ROOT, 'tools', 'launcher_build.py'))   # 런처 GMD·글꼴 → build/romfs/.../romNX
+run(sys.executable, '-I', os.path.join(ROOT, 'tools', 'launcher_logo.py'))   # 런처 게임 고르기 로고(제로 1~4) → TitleUI.arc
 if '--deploy' in sys.argv:   # Eden 모드 폴더에 복사
     import shutil
     mod = r'D:\Games\Kor Patch\CLude\eden emul\user\load\010025C00D410000\KoreanPatch'

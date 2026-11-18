@@ -105,14 +105,19 @@ def main():
         if conflict and not allow:
             fail(f'{fn}#{i} {base:#x}: 컬렉션판과 다른 바이트 {conflict}개')
         print(f'{fn}#{i} {lo:#x}-{hi:#x}: {moved} 바이트, 충돌 {conflict}' + (' (한글 바이트로 덮음)' if allow == 'merge' else ''))
-        if fn == 'title_z1' and lo == 0x2F1294:   # 로고: 컬렉션이 지운 ® 를 한글 ® 자리에서도 지운다
+        if fn == 'title_z1' and lo == 0x2F1294:   # 로고: 사용자 HD 로고를 컬렉션 원본 타일 위에 다시 합성(바탕은 컬렉션 값), 맵은 항목 1
             coll = zcpack.entries(work[fn][0])[i][3]
-            ent = struct.unpack_from('<1024H', jp, 0x2E008C)
-            at = lambda x, y: 0x2F1294 + (ent[(y // 8) * 32 + x // 8] & 0x3FF) * 64 + (y % 8) * 8 + x % 8
-            def setter(a, v, d=d, base=base):
-                d[a - base] = v
             import rz2_gfx   # rz2_gfx 가 이 모듈의 rebuild 를 가져가므로 여기서 늦게
-            rz2_gfx.move_registered_erase(1, jp.__getitem__, kr.__getitem__, lambda a: coll[a - base], setter, at, 'title_z1 로고')
+            tb = 0x2F1294 - base
+            t, pool, old, newmap = rz2_gfx.hd_logo_compose(1, coll, 0x2E008C, 0, 32, 32, base=tb, fn='title_z1')
+            for k in pool:
+                d[tb + k * 64:tb + k * 64 + 64] = t[tb + k * 64:tb + k * 64 + 64]
+            m = entry(fn, 1)
+            mat = m.find(old)
+            if mat < 0 or m.find(old, mat + 1) >= 0:
+                fail('title_z1#1: 로고 맵 원본을 한 곳에서 찾지 못함')
+            m[mat:mat + len(old)] = newmap
+            print(f'title_z1#1: 로고 맵 {mat:#x} 교체')
         total += moved
 
     # 무기 라벨

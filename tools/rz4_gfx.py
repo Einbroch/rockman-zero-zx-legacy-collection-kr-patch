@@ -180,7 +180,7 @@ def logo_erase_registered(new, jraw, kraw, coll):
 
 
 if __name__ == '__main__':
-    rz2_gfx.run(JP_ROM, KR_ROM, TILESETS, [], 'obj_fnt_z4', post={('title_z4', 0, 0x00): logo_erase_registered})
+    rz2_gfx.run(JP_ROM, KR_ROM, TILESETS, [], 'obj_fnt_z4', post={('title_z4', 0, 0x00): rz2_gfx.hd_logo_post(4, 0xB2CCE0, 0x100, 32, 20, 384, 0xB2CCE0 + 20 * 64)})
     _jp, _kr = open(JP_ROM, 'rb').read(), open(KR_ROM, 'rb').read()
     raw_tiles(_jp, _kr)
     opening(_jp, _kr)

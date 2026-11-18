@@ -42,4 +42,4 @@ SPRITES = [
 ]
 
 if __name__ == '__main__':
-    rz2_gfx.run(JP_ROM, KR_ROM, TILESETS, SPRITES, 'obj_fnt_z3', post={('title_z3', 0, 0x00): rz2_gfx.logo_post(3, 0x522ED0, 0x100, cols=30)})
+    rz2_gfx.run(JP_ROM, KR_ROM, TILESETS, SPRITES, 'obj_fnt_z3', post={('title_z3', 0, 0x00): rz2_gfx.hd_logo_post(3, 0x522ED0, 0x100, 30, 20)})

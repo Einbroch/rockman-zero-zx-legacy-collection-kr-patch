@@ -273,6 +273,7 @@ def run(jp_path, kr_path, tilesets, sprites, objfile, post=None):
         print(f"{objfile}#{ei} ({sp['desc']:#x}): 타일 {n}개")
 
     os.makedirs(OUT, exist_ok=True)
+    apply_entry_edits(entry)
     for fn, (buf, ch) in work.items():
         orig = zcpack.entries(buf)
         news = {i: bytes(v) for i, v in ch.items() if bytes(v) != orig[i][3]}
@@ -287,6 +288,63 @@ def run(jp_path, kr_path, tilesets, sprites, objfile, post=None):
         print(f'{fn}.bin: 항목 {sorted(news)} 교체, {len(buf):#x} -> {len(out):#x}')
 
 
+ENTRY_EDITS = []   # (파일, 항목, 원래 바이트, 새 바이트) — run 끝에서 그 항목 안 유일한 자리를 바꾼다
+
+
+def logo_hd_mod():
+    g = os.path.join(ROOT, '..', 'Rockman Zero', 'tools')
+    if g not in sys.path:
+        sys.path.insert(0, g)
+    import logo_hd
+    return logo_hd
+
+
+def hd_map(title, map_addr, cols, nrows, extra_count=0, extra_at=None):
+    """일본판 롬의 로고 맵 (행 목록, 화면 밖 항목)"""
+    name = 'Rockman Zero (Japan).gba' if title == 1 else f'Rockman Zero {title} (Japan).gba'
+    jp = open(os.path.join(ROOT, '..', 'Rockman Zero', 'roms', name), 'rb').read()
+    LH = logo_hd_mod()
+    rows = LH.read_rows(jp, map_addr, cols, nrows)
+    extra = struct.unpack_from(f'<{extra_count}H', jp, extra_at) if extra_count else ()
+    return rows, extra
+
+
+def hd_logo_compose(title, tiles, map_addr, tile0, cols, nrows, base=0, extra_count=0, extra_at=None, fn=None, exclude=()):
+    """컬렉션 타일(제 바탕값)에 사용자 HD 로고를 그대로 합성 -> (합성된 타일, 바뀐 타일 번호들, 원래 맵 바이트, 새 맵 바이트)"""
+    LH = logo_hd_mod()
+    rows, extra = hd_map(title, map_addr, cols, nrows, extra_count, extra_at)
+    old = LH.pack_rows(rows[:LH.TOP_ROWS])   # 바뀌는 건 로고 구역(0~15행)뿐 — 그 부분만 찾아 바꾼다
+    t = bytearray(tiles)
+    info = LH.compose(title, t, rows, tile0, base=base, extra=extra, exclude=exclude)
+    if LH.pack_rows(rows[LH.TOP_ROWS:]) != LH.pack_rows(hd_map(title, map_addr, cols, nrows, extra_count, extra_at)[0][LH.TOP_ROWS:]):
+        fail(f'title_z{title}: 로고 구역 밖 맵이 바뀜')
+    print(f'{fn or "title"} HD 로고: 크기 {info["size"]} @ {info["offset"]} (비율 {info["scale"]}), 타일 {info["tiles"]}/{info["pool"]}, 색 {info["colors"]}')
+    return t, info['pool_ids'], old, LH.pack_rows(rows[:LH.TOP_ROWS])
+
+
+def hd_logo_post(title, map_addr, tile0, cols, nrows, extra_count=0, extra_at=None, exclude=()):
+    """exclude: 컬렉션이 GBA 와 다른 색으로 바꾼 팔레트 번호(Eden 화면 대조로 찾음)"""
+    """타일셋 레코드 로고(2~4편): 사용자 HD 로고를 컬렉션 원본 타일 위에 다시 합성하고(바탕은 컬렉션 값), 맵은 항목 1 에서 바꾼다"""
+    def f(new, jraw, kraw, coll):
+        t, pool, old, newmap = hd_logo_compose(title, coll, map_addr, tile0, cols, nrows, 0, extra_count, extra_at, f'title_z{title}', exclude)
+        for k in pool:
+            o = (k - tile0) * 64
+            new[o:o + 64] = t[o:o + 64]
+        ENTRY_EDITS.append((f'title_z{title}', 1, old, newmap))
+    return f
+
+
+def apply_entry_edits(entry):
+    while ENTRY_EDITS:
+        fn, i, old, new = ENTRY_EDITS.pop(0)
+        d = entry(fn, i)
+        at = d.find(old)
+        if at < 0 or d.find(old, at + 1) >= 0:
+            fail(f'{fn}#{i}: 로고 맵 원본을 한 곳에서 찾지 못함')
+        d[at:at + len(old)] = new
+        print(f'{fn}#{i}: 로고 맵 {at:#x} ({len(old)} 바이트) 교체')
+
+
 def logo_post(title, map_addr, tile0, cols=32):
     """타일셋 레코드 로고(2·3편): 타일 번호 = (맵 칸 & 0x3FF) - tile0, 맵 한 행 cols 칸 (GBA logo_rzN 과 같은 계산)"""
     def f(new, jraw, kraw, coll):
@@ -299,7 +357,7 @@ def logo_post(title, map_addr, tile0, cols=32):
 def main():
     run(JP_ROM, KR_ROM, TILESETS,
         [dict(kind='stream', desc=desc, gpal=gpal, entry=ei, fixed=fixed) for desc, gpal, ei, fixed in SPRITES],
-        'obj_fnt_z2', post={('title_z2', 0, 0x14): logo_post(2, 0x3873B0, 0)})
+        'obj_fnt_z2', post={('title_z2', 0, 0x14): hd_logo_post(2, 0x3873B0, 0, 32, 32, 1024, 0x3873B0 + 0x800, exclude={113})})   # 113: GBA 흰색, 컬렉션은 초록
 
 
 if __name__ == '__main__':
