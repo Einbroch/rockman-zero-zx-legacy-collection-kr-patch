@@ -13,7 +13,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = 'v0.9.6'
+VERSION = 'v0.9.7'
 TID = '010025C00D410000'
 NAME = 'MMZZXLC'
 FIXED_TIME = (2026, 11, 17, 0, 0, 0)   # 같은 입력이면 같은 zip
